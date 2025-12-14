@@ -8,7 +8,10 @@ pub fn run() {
 
     let rotations: Vec<LockRotation> = input
         .iter()
-        .map(|line| line.parse().expect(&format!("Cannot parse line: {}", line)))
+        .map(|line| {
+            line.parse()
+                .unwrap_or_else(|_| panic!("Cannot parse line: {line}"))
+        })
         .collect();
 
     println!("Day 1 Part 1: {:?}", part_1(&rotations));
@@ -30,8 +33,15 @@ fn part_1(lock_rotations: &[LockRotation]) -> isize {
     result
 }
 
-fn part_2(_input: &[LockRotation]) -> isize {
-    unimplemented!("Not yet implemented!")
+fn part_2(lock_rotations: &[LockRotation]) -> isize {
+    let mut result = 0;
+    let mut lock = Lock::default();
+
+    for rotation in lock_rotations {
+        result += lock.rotate_mut(*rotation);
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -42,7 +52,10 @@ mod tests {
     fn test_part_1() {
         let input: Vec<LockRotation> = to_string_vector("test_inputs/day_01.txt")
             .iter()
-            .map(|line| line.parse().expect(&format!("Cannot parse line: {}", line)))
+            .map(|line| {
+                line.parse()
+                    .unwrap_or_else(|_| panic!("Cannot parse line: {line}"))
+            })
             .collect();
 
         assert_eq!(part_1(&input), 3);
@@ -50,11 +63,14 @@ mod tests {
 
     #[test]
     fn test_part_2() {
-        let _input: Vec<LockRotation> = to_string_vector("test_inputs/day_01.txt")
+        let input: Vec<LockRotation> = to_string_vector("test_inputs/day_01.txt")
             .iter()
-            .map(|line| line.parse().expect(&format!("Cannot parse line: {}", line)))
+            .map(|line| {
+                line.parse()
+                    .unwrap_or_else(|_| panic!("Cannot parse line: {line}"))
+            })
             .collect();
 
-        unimplemented!("Not yet implemented!")
+        assert_eq!(part_2(&input), 6);
     }
 }

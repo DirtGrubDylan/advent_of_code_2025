@@ -23,12 +23,16 @@ impl Lock {
             LockRotation::Right(val) => self.current_position + val,
         };
 
-        zeros_seen += new_position / 100;
+        zeros_seen += new_position.abs() / 100;
 
-        if new_position < 0 {
+        if new_position == 0 {
             zeros_seen += 1;
+        } else if new_position < 0 {
+            if self.current_position != 0 {
+                zeros_seen += 1;
+            }
 
-            new_position = 100 + (new_position % 100);
+            new_position = 100 - (new_position.abs() % 100);
         }
 
         self.current_position = new_position % 100;
@@ -106,10 +110,10 @@ mod tests {
     fn test_lock_rotate_mut_right() {
         let mut lock = Lock::default();
 
-        let result = lock.rotate_mut(LockRotation::Right(68));
+        let result = lock.rotate_mut(LockRotation::Right(1000));
 
-        assert_eq!(result, 1);
-        assert_eq!(lock.current_position, 18);
+        assert_eq!(result, 10);
+        assert_eq!(lock.current_position, 50);
     }
 
     #[test]
@@ -120,11 +124,14 @@ mod tests {
 
         let mut lock = Lock::default();
         let mut password = 0;
+        let mut zeros_seen = 0;
 
         for value in input {
             let rotation = value.parse().unwrap();
 
-            lock.rotate_mut(rotation);
+            let number_of_clicks = lock.rotate_mut(rotation);
+
+            zeros_seen += number_of_clicks;
 
             if lock.current_position == 0 {
                 password += 1;
@@ -132,6 +139,34 @@ mod tests {
         }
 
         assert_eq!(password, 3);
+        assert_eq!(zeros_seen, 6);
         assert_eq!(lock.current_position, 32);
+    }
+
+    #[test]
+    fn test_lock_rotate_mut_array_large() {
+        let input = [
+            "R1000", "L1000", "L50", "R1", "L1", "L1", "R1", "R100", "R1",
+        ];
+
+        let mut lock = Lock::default();
+        let mut password = 0;
+        let mut zeros_seen = 0;
+
+        for value in input {
+            let rotation = value.parse().unwrap();
+
+            let number_of_clicks = lock.rotate_mut(rotation);
+
+            zeros_seen += number_of_clicks;
+
+            if lock.current_position == 0 {
+                password += 1;
+            }
+        }
+
+        assert_eq!(password, 4);
+        assert_eq!(zeros_seen, 24);
+        assert_eq!(lock.current_position, 1);
     }
 }
