@@ -1,6 +1,13 @@
 use std::mem;
 use std::ops::{Div, Mul, Neg, Rem};
 
+pub fn divmod<T>(first: T, second: T) -> (T, T)
+where
+    T: Mul<Output = T> + Div<Output = T> + Rem<Output = T> + Copy,
+{
+    (first / second, first % second)
+}
+
 pub fn gcd<T>(first: T, second: T) -> T
 where
     T: Rem<Output = T> + Neg<Output = T> + PartialEq + Eq + Ord + Copy + From<u8>,
@@ -23,11 +30,7 @@ where
         min = res;
     }
 
-    if min < T::from(0) {
-        -min
-    } else {
-        min
-    }
+    if min < T::from(0) { -min } else { min }
 }
 
 pub fn lcm<T>(first: T, second: T) -> T
@@ -106,6 +109,12 @@ pub fn min_positive_linear_diophantine(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_divmod() {
+        assert_eq!(divmod(26, 7), (3, 5));
+        assert_eq!(divmod(763, 100), (7, 63));
+    }
 
     #[test]
     fn test_gcd_not_1() {
