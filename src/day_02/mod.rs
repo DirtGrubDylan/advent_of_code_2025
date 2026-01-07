@@ -2,7 +2,7 @@ mod product;
 
 use crate::util::file_reader::to_string_vector;
 
-use product::{Id, IdRange};
+use product::IdRange;
 
 pub fn run() {
     let input = to_string_vector("inputs/day_02.txt")
@@ -14,7 +14,7 @@ pub fn run() {
     println!("Day 1 Part 2: {:?}", part_2(&input));
 }
 
-fn part_1(input: &String) -> u64 {
+fn part_1(input: &str) -> u64 {
     let ranges: Vec<IdRange> = input
         .split(',')
         .map(|value| {
@@ -26,13 +26,24 @@ fn part_1(input: &String) -> u64 {
 
     ranges
         .iter()
-        .flat_map(|range| range.invalid_ids_within().into_iter())
-        .fold(Id::from(0), |a, b| a + b)
-        .into()
+        .flat_map(|range| range.invalid_ids_within(2).into_iter())
+        .fold(0, |acc, id| acc + u64::from(id))
 }
 
-fn part_2(_input: &String) -> u64 {
-    unimplemented!()
+fn part_2(input: &str) -> u64 {
+    let ranges: Vec<IdRange> = input
+        .split(',')
+        .map(|value| {
+            value
+                .parse()
+                .unwrap_or_else(|_| panic!("Could not parse {value} in an IdRange!"))
+        })
+        .collect();
+
+    ranges
+        .iter()
+        .flat_map(|range| range.all_invalid_ids_within().into_iter())
+        .fold(0, |acc, id| acc + u64::from(id))
 }
 
 #[cfg(test)]
@@ -56,6 +67,6 @@ mod tests {
             .cloned()
             .unwrap();
 
-        assert_eq!(part_2(&input), 3);
+        assert_eq!(part_2(&input), 4_174_379_265);
     }
 }

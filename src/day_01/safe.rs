@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
@@ -25,14 +26,18 @@ impl Lock {
 
         zeros_seen += new_position.abs() / 100;
 
-        if new_position == 0 {
-            zeros_seen += 1;
-        } else if new_position < 0 {
-            if self.current_position != 0 {
+        match new_position.cmp(&0) {
+            Ordering::Equal => {
                 zeros_seen += 1;
             }
+            Ordering::Less => {
+                if self.current_position != 0 {
+                    zeros_seen += 1;
+                }
 
-            new_position = 100 - (new_position.abs() % 100);
+                new_position = 100 - (new_position.abs() % 100);
+            }
+            Ordering::Greater => {}
         }
 
         self.current_position = new_position % 100;

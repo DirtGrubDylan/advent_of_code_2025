@@ -1,70 +1,85 @@
+use std::collections::HashSet;
+use std::convert::Into;
 use std::ops::{Add, AddAssign, Range};
 use std::str::FromStr;
 
-use crate::util::math::divmod;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Id {
-    value: u64,
+    number: u64,
+    digits: Vec<u64>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct IdParseError;
 
 impl Id {
-    fn is_invalid(&self) -> bool {
-        let number_of_digits = Id::number_of_digits(self.value);
-
-        if (number_of_digits % 2) == 0 {
-            let (first, second) = Id::split(self.value);
-
-            first == second
+    fn is_invalid(&self, number_of_chunks: usize) -> bool {
+        if let Some((first, rest)) = self.as_chunks(number_of_chunks).split_first() {
+            rest.iter().all(|x| x == first)
         } else {
             false
         }
     }
 
-    fn next_invalid_id(&self) -> Id {
-        let number_of_digits = Id::number_of_digits(self.value);
+    fn next_invalid_id(&self, number_of_chunks: usize) -> Id {
+        let number_of_digits = self.len();
 
-        let (first, second) = if (number_of_digits % 2) == 0 {
-            Id::split(self.value)
+        let current_id = if (number_of_digits % number_of_chunks) == 0 {
+            self.clone()
         } else {
-            Id::split(10_u64.pow(number_of_digits.try_into().unwrap()))
+            let next_power =
+                number_of_chunks - (number_of_digits % number_of_chunks) + number_of_digits - 1;
+
+            Id::from(10_u64.pow(next_power.try_into().unwrap()))
         };
 
-        if first > second {
-            Id::new_from_half_mirrored(first)
-        } else {
-            Id::new_from_half_mirrored(first + 1)
+        let chunks = current_id.as_chunks(number_of_chunks);
+
+        let number_of_chunks = chunks.len();
+
+        let Some((first, rest)) = chunks.split_first() else {
+            panic!(
+                "Could not split {} into {number_of_chunks} chunks!",
+                current_id.number
+            )
+        };
+
+        let mut start_value = *first;
+
+        for &next in rest {
+            if start_value == next {
+                continue;
+            }
+
+            if start_value > next {
+                start_value -= 1;
+            }
+
+            break;
         }
+
+        Id::new_from_repeated(start_value + 1, chunks.len())
     }
 
-    fn split(input: u64) -> (u64, u64) {
-        let number_of_digits = Id::number_of_digits(input);
-
-        if (number_of_digits % 2) == 1 {
-            panic!("{input} does not have an even amount of digits!");
+    fn as_chunks(&self, number_of_chunks: usize) -> Vec<u64> {
+        if self.len() % number_of_chunks != 0 {
+            return Vec::new();
         }
 
-        let divisor = 10_u64.pow((number_of_digits / 2).try_into().unwrap());
+        let chunk_size = self.len() / number_of_chunks;
 
-        divmod(input, divisor)
+        self.digits
+            .chunks_exact(chunk_size)
+            .map(|chunk| chunk.iter().fold(0, |acc, x| acc * 10 + x))
+            .collect()
     }
 
-    fn number_of_digits(input: u64) -> u64 {
-        match input {
-            0 => 1,
-            _ => (input.ilog10() + 1).into(),
-        }
+    fn len(&self) -> usize {
+        self.digits.len()
     }
 
-    fn new_from_half_mirrored(input: u64) -> Id {
-        let number_of_digits = Id::number_of_digits(input);
-
-        let multiplier = 10_u64.pow(number_of_digits.try_into().unwrap());
-
-        Id::from(input * (multiplier + 1))
+    fn new_from_repeated(number: u64, repeated: usize) -> Id {
+        number.to_string().repeat(repeated).parse().unwrap()
     }
 }
 
@@ -72,22 +87,26 @@ impl FromStr for Id {
     type Err = IdParseError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        input
-            .parse::<u64>()
-            .map(|value| Id::from(value))
-            .map_err(|_| IdParseError)
+        input.parse::<u64>().map(Id::from).map_err(|_| IdParseError)
     }
 }
 
 impl From<u64> for Id {
-    fn from(value: u64) -> Self {
-        Id { value }
+    fn from(number: u64) -> Self {
+        let digits: Vec<u64> = number
+            .to_string()
+            .chars()
+            .filter_map(|c| c.to_digit(10))
+            .map(Into::into)
+            .collect();
+
+        Id { number, digits }
     }
 }
 
 impl From<Id> for u64 {
     fn from(id: Id) -> Self {
-        id.value
+        id.number
     }
 }
 
@@ -95,13 +114,13 @@ impl Add for Id {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Id::from(self.value + rhs.value)
+        Id::from(self.number + rhs.number)
     }
 }
 
 impl AddAssign for Id {
     fn add_assign(&mut self, rhs: Self) {
-        self.value += rhs.value;
+        self.number += rhs.number;
     }
 }
 
@@ -120,23 +139,38 @@ impl IdRange {
         }
     }
 
-    pub fn invalid_ids_within(&self) -> Vec<Id> {
-        let mut result = Vec::new();
-        let mut current_id = Id::from(self.range.start);
+    pub fn all_invalid_ids_within(&self) -> HashSet<Id> {
+        let mut result = HashSet::new();
+        let max_number_of_digits = Id::from(self.range.end).len();
 
-        while self.contains(current_id) {
-            if current_id.is_invalid() {
-                result.push(current_id);
+        for number_of_chunks in 2..=max_number_of_digits {
+            for id in self.invalid_ids_within(number_of_chunks) {
+                result.insert(id.clone());
             }
-
-            current_id = current_id.next_invalid_id();
         }
 
         result
     }
 
-    fn contains(&self, id: Id) -> bool {
-        self.range.contains(&id.value)
+    pub fn invalid_ids_within(&self, number_of_chunks: usize) -> Vec<Id> {
+        let mut result = Vec::new();
+        let mut current_id = Id::from(self.range.start);
+
+        if !current_id.is_invalid(number_of_chunks) {
+            current_id = current_id.next_invalid_id(number_of_chunks);
+        }
+
+        while self.contains(&current_id) {
+            result.push(current_id.clone());
+
+            current_id = current_id.next_invalid_id(number_of_chunks);
+        }
+
+        result
+    }
+
+    fn contains(&self, id: &Id) -> bool {
+        self.range.contains(&id.number)
     }
 }
 
@@ -146,10 +180,10 @@ impl FromStr for IdRange {
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let (start, end) = input.split_once('-').ok_or(IdRangeParseError)?;
 
-        let start_value = start.parse::<u64>().map_err(|_| IdRangeParseError)?;
-        let end_value = end.parse::<u64>().map_err(|_| IdRangeParseError)?;
+        let start_number = start.parse::<u64>().map_err(|_| IdRangeParseError)?;
+        let end_number = end.parse::<u64>().map_err(|_| IdRangeParseError)?;
 
-        Ok(IdRange::new(start_value, end_value + 1))
+        Ok(IdRange::new(start_number, end_number + 1))
     }
 }
 
@@ -168,7 +202,13 @@ mod tests {
     #[test]
     fn test_id_from_str_ok() {
         assert_eq!("1".parse(), Ok(Id::from(1)));
-        assert_eq!("1234".parse(), Ok(Id::from(1_234)));
+        assert_eq!(
+            "1234".parse(),
+            Ok(Id {
+                number: 1_234,
+                digits: vec![1, 2, 3, 4],
+            })
+        );
     }
 
     #[test]
@@ -186,53 +226,67 @@ mod tests {
     }
 
     #[test]
-    fn test_id_is_invalid() {
-        assert_eq!(Id::from(0).is_invalid(), false);
-        assert_eq!(Id::from(11).is_invalid(), true);
-        assert_eq!(Id::from(14).is_invalid(), false);
-        assert_eq!(Id::from(100).is_invalid(), false);
-        assert_eq!(Id::from(763).is_invalid(), false);
-        assert_eq!(Id::from(1514).is_invalid(), false);
-        assert_eq!(Id::from(1515).is_invalid(), true);
-        assert_eq!(Id::from(1516).is_invalid(), false);
-        assert_eq!(Id::from(1188511880).is_invalid(), false);
-        assert_eq!(Id::from(1188511885).is_invalid(), true);
+    fn test_id_is_invalid_chunk_size_2() {
+        assert!(!Id::from(0).is_invalid(2));
+        assert!(Id::from(11).is_invalid(2));
+        assert!(!Id::from(14).is_invalid(2));
+        assert!(!Id::from(100).is_invalid(2));
+        assert!(!Id::from(763).is_invalid(2));
+        assert!(!Id::from(1_514).is_invalid(2));
+        assert!(Id::from(1_515).is_invalid(2));
+        assert!(!Id::from(1_516).is_invalid(2));
+        assert!(!Id::from(1_188_511_880).is_invalid(2));
+        assert!(Id::from(1_188_511_885).is_invalid(2));
     }
 
     #[test]
-    fn test_id_next_invalid_id() {
-        assert_eq!(Id::from(0).next_invalid_id(), Id::from(11));
-        assert_eq!(Id::from(11).next_invalid_id(), Id::from(22));
-        assert_eq!(Id::from(14).next_invalid_id(), Id::from(22));
-        assert_eq!(Id::from(100).next_invalid_id(), Id::from(1010));
-        assert_eq!(Id::from(763).next_invalid_id(), Id::from(1010));
-        assert_eq!(Id::from(1514).next_invalid_id(), Id::from(1515));
-        assert_eq!(Id::from(1515).next_invalid_id(), Id::from(1616));
-        assert_eq!(Id::from(1516).next_invalid_id(), Id::from(1616));
-        assert_eq!(Id::from(1188511880).next_invalid_id(), Id::from(1188511885));
+    fn test_id_next_invalid_id_chunk_size_2() {
+        assert_eq!(Id::from(0).next_invalid_id(2), Id::from(11));
+        assert_eq!(Id::from(11).next_invalid_id(2), Id::from(22));
+        assert_eq!(Id::from(14).next_invalid_id(2), Id::from(22));
+        assert_eq!(Id::from(100).next_invalid_id(2), Id::from(1010));
+        assert_eq!(Id::from(763).next_invalid_id(2), Id::from(1010));
+        assert_eq!(Id::from(1_514).next_invalid_id(2), Id::from(1515));
+        assert_eq!(Id::from(1_515).next_invalid_id(2), Id::from(1616));
+        assert_eq!(Id::from(1_516).next_invalid_id(2), Id::from(1616));
+        assert_eq!(
+            Id::from(1_188_511_880).next_invalid_id(2),
+            Id::from(1_188_511_885)
+        );
     }
 
     #[test]
-    fn test_id_split() {
-        assert_eq!(Id::split(12), (1, 2));
-        assert_eq!(Id::split(1234), (12, 34));
-        assert_eq!(Id::split(123456), (123, 456));
+    fn test_id_as_chunks() {
+        assert_eq!(Id::from(12).as_chunks(2), vec![1, 2]);
+        assert_eq!(Id::from(1_234).as_chunks(2), vec![12, 34]);
+        assert_eq!(Id::from(123_456).as_chunks(2), vec![123, 456]);
+
+        assert_eq!(Id::from(12).as_chunks(3), vec![]);
+        assert_eq!(Id::from(1_234).as_chunks(3), vec![]);
+        assert_eq!(Id::from(123_456).as_chunks(3), vec![12, 34, 56]);
+
+        assert_eq!(Id::from(12).as_chunks(4), vec![]);
+        assert_eq!(Id::from(1_234).as_chunks(4), vec![1, 2, 3, 4]);
+        assert_eq!(Id::from(123_456).as_chunks(4), vec![]);
+
+        assert_eq!(Id::from(123_456).as_chunks(6), vec![1, 2, 3, 4, 5, 6]);
     }
 
     #[test]
-    fn test_id_number_of_digits() {
-        assert_eq!(Id::number_of_digits(0), 1);
-        assert_eq!(Id::number_of_digits(1), 1);
-        assert_eq!(Id::number_of_digits(1234), 4);
-        assert_eq!(Id::number_of_digits(123_456_789), 9);
+    fn test_id_len() {
+        assert_eq!(Id::from(0).len(), 1);
+        assert_eq!(Id::from(1).len(), 1);
+        assert_eq!(Id::from(1_234).len(), 4);
+        assert_eq!(Id::from(123_456_789).len(), 9);
     }
 
     #[test]
-    fn test_id_new_from_half_mirrored() {
-        assert_eq!(Id::new_from_half_mirrored(0), Id::from(0));
-        assert_eq!(Id::new_from_half_mirrored(1), Id::from(11));
-        assert_eq!(Id::new_from_half_mirrored(12), Id::from(1212));
-        assert_eq!(Id::new_from_half_mirrored(11885), Id::from(1188511885));
+    fn test_id_new_from_repeated() {
+        assert_eq!(Id::new_from_repeated(0, 2), Id::from(0));
+        assert_eq!(Id::new_from_repeated(1, 1), Id::from(1));
+        assert_eq!(Id::new_from_repeated(12, 2), Id::from(1_212));
+        assert_eq!(Id::new_from_repeated(12, 3), Id::from(121_212));
+        assert_eq!(Id::new_from_repeated(11_885, 2), Id::from(1_188_511_885));
     }
 
     #[test]
@@ -258,22 +312,22 @@ mod tests {
     fn test_id_range_contains() {
         let range = IdRange::new(0, 101);
 
-        assert!(range.contains(Id::from(0)));
-        assert!(range.contains(Id::from(5)));
-        assert!(range.contains(Id::from(100)));
+        assert!(range.contains(&Id::from(0)));
+        assert!(range.contains(&Id::from(5)));
+        assert!(range.contains(&Id::from(100)));
     }
 
     #[test]
     fn test_id_range_does_not_contain() {
         let range = IdRange::new(0, 101);
 
-        assert!(!range.contains(Id::from(101)));
+        assert!(!range.contains(&Id::from(101)));
     }
 
     #[test]
-    fn test_id_range_invalid_ids_within() {
+    fn test_id_range_invalid_ids_within_chunk_size_2() {
         assert_eq!(
-            IdRange::new(0, 100).invalid_ids_within(),
+            IdRange::new(0, 100).invalid_ids_within(2),
             vec![
                 Id::from(11),
                 Id::from(22),
@@ -287,9 +341,71 @@ mod tests {
             ]
         );
         assert_eq!(
-            IdRange::new(1_188_511_880, 1_188_511_890).invalid_ids_within(),
-            vec![Id::from(1188511885),]
+            IdRange::new(1_188_511_880, 1_188_511_890).invalid_ids_within(2),
+            vec![Id::from(1_188_511_885),]
         );
-        assert_eq!(IdRange::new(10_000, 100_000).invalid_ids_within(), vec![],);
+        assert_eq!(IdRange::new(10_000, 100_000).invalid_ids_within(2), vec![],);
+    }
+
+    #[test]
+    fn test_id_range_invalid_ids_within_chunk_size_3() {
+        assert_eq!(
+            IdRange::new(0, 1_001).invalid_ids_within(3),
+            vec![
+                Id::from(111),
+                Id::from(222),
+                Id::from(333),
+                Id::from(444),
+                Id::from(555),
+                Id::from(666),
+                Id::from(777),
+                Id::from(888),
+                Id::from(999),
+            ]
+        );
+        assert_eq!(
+            IdRange::new(1_188_511_880, 1_188_511_890).invalid_ids_within(3),
+            vec![]
+        );
+        assert_eq!(
+            IdRange::new(565_654, 565_659).invalid_ids_within(3),
+            vec![Id::from(565_656)],
+        );
+    }
+
+    #[test]
+    fn test_id_range_all_invalid_ids_within() {
+        assert_eq!(
+            IdRange::new(11_111_111, 11_131_114).all_invalid_ids_within(),
+            HashSet::from([
+                Id::from(11_111_111),
+                Id::from(11_121_112),
+                Id::from(11_131_113)
+            ]),
+        );
+        assert_eq!(
+            IdRange::new(11, 23).all_invalid_ids_within(),
+            HashSet::from([Id::from(11), Id::from(22)]),
+        );
+        assert_eq!(
+            IdRange::new(2_121_212_118, 2_121_212_125).all_invalid_ids_within(),
+            HashSet::from([Id::from(2_121_212_121)])
+        );
+        assert_eq!(
+            IdRange::new(222_220, 222_225).all_invalid_ids_within(),
+            HashSet::from([Id::from(222_222)])
+        );
+        assert_eq!(
+            IdRange::new(998, 1_013).all_invalid_ids_within(),
+            HashSet::from([Id::from(999), Id::from(1010)]),
+        );
+        assert_eq!(
+            IdRange::new(69_302, 80_372).all_invalid_ids_within(),
+            HashSet::from([Id::from(77_777)]),
+        );
+        assert_eq!(
+            IdRange::new(5_858_546_565, 5_858_614_011).all_invalid_ids_within(),
+            HashSet::from([Id::from(5_858_558_585), Id::from(5_858_585_858)]),
+        );
     }
 }
