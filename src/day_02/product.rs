@@ -24,7 +24,7 @@ impl Id {
     fn next_invalid_id(&self, number_of_chunks: usize) -> Id {
         let number_of_digits = self.len();
 
-        let current_id = if (number_of_digits % number_of_chunks) == 0 {
+        let current_id = if number_of_digits.is_multiple_of(number_of_chunks) {
             self.clone()
         } else {
             let next_power =
@@ -62,7 +62,7 @@ impl Id {
     }
 
     fn as_chunks(&self, number_of_chunks: usize) -> Vec<u64> {
-        if self.len() % number_of_chunks != 0 {
+        if !self.len().is_multiple_of(number_of_chunks) {
             return Vec::new();
         }
 
