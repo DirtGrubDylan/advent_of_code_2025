@@ -9,18 +9,30 @@ use super::point_2d::Point2d;
 #[allow(dead_code)]
 pub const UP: Point2d<i32> = Point2d { x: 0, y: -1 };
 #[allow(dead_code)]
+pub const UP_RIGHT: Point2d<i32> = Point2d { x: 1, y: -1 };
+#[allow(dead_code)]
 pub const RIGHT: Point2d<i32> = Point2d { x: 1, y: 0 };
+#[allow(dead_code)]
+pub const DOWN_RIGHT: Point2d<i32> = Point2d { x: 1, y: 1 };
 #[allow(dead_code)]
 pub const DOWN: Point2d<i32> = Point2d { x: 0, y: 1 };
 #[allow(dead_code)]
+pub const DOWN_LEFT: Point2d<i32> = Point2d { x: -1, y: 1 };
+#[allow(dead_code)]
 pub const LEFT: Point2d<i32> = Point2d { x: -1, y: 0 };
+#[allow(dead_code)]
+pub const UP_LEFT: Point2d<i32> = Point2d { x: -1, y: -1 };
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Direction {
     Up,
+    UpRight,
     Right,
+    DownRight,
     Down,
+    DownLeft,
     Left,
+    UpLeft,
 }
 
 impl Direction {
@@ -28,9 +40,13 @@ impl Direction {
     pub fn as_offset(self) -> Point2d<i32> {
         match self {
             Direction::Up => UP,
+            Direction::UpRight => UP_RIGHT,
             Direction::Right => RIGHT,
+            Direction::DownRight => DOWN_RIGHT,
             Direction::Down => DOWN,
+            Direction::DownLeft => DOWN_LEFT,
             Direction::Left => LEFT,
+            Direction::UpLeft => UP_LEFT,
         }
     }
 
@@ -38,9 +54,13 @@ impl Direction {
     pub fn turn_90_degrees_clockwise(self) -> Self {
         match self {
             Direction::Up => Direction::Right,
+            Direction::UpRight => Direction::DownRight,
             Direction::Right => Direction::Down,
+            Direction::DownRight => Direction::DownLeft,
             Direction::Down => Direction::Left,
+            Direction::DownLeft => Direction::UpLeft,
             Direction::Left => Direction::Up,
+            Direction::UpLeft => Direction::UpRight,
         }
     }
 
@@ -48,9 +68,13 @@ impl Direction {
     pub fn turn_90_degrees_counter_clockwise(self) -> Self {
         match self {
             Direction::Up => Direction::Left,
+            Direction::UpRight => Direction::UpLeft,
             Direction::Right => Direction::Up,
+            Direction::DownRight => Direction::UpRight,
             Direction::Down => Direction::Right,
+            Direction::DownLeft => Direction::DownRight,
             Direction::Left => Direction::Down,
+            Direction::UpLeft => Direction::DownLeft,
         }
     }
 
@@ -58,9 +82,13 @@ impl Direction {
     pub fn opposite(self) -> Self {
         match self {
             Direction::Up => Direction::Down,
+            Direction::UpRight => Direction::DownLeft,
             Direction::Right => Direction::Left,
+            Direction::DownRight => Direction::UpLeft,
             Direction::Down => Direction::Up,
+            Direction::DownLeft => Direction::UpRight,
             Direction::Left => Direction::Right,
+            Direction::UpLeft => Direction::DownRight,
         }
     }
 }
