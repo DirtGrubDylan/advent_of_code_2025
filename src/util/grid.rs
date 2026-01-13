@@ -36,6 +36,17 @@ pub enum Direction {
 }
 
 impl Direction {
+    pub const VALUES: [Self; 8] = [
+        Self::Up,
+        Self::UpRight,
+        Self::Right,
+        Self::DownRight,
+        Self::Down,
+        Self::DownLeft,
+        Self::Left,
+        Self::UpLeft,
+    ];
+
     #[must_use]
     pub fn as_offset(self) -> Point2d<i32> {
         match self {
